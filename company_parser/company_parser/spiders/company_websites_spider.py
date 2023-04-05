@@ -13,8 +13,17 @@ class CompanyWebSiteSpider(scrapy.Spider):
         "DOWNLOADER_MIDDLEWARES": {
             'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
             'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400,
+            'scrapy_playwright.browser.BrowserMiddleware': 543
         },
-        'REDIRECT_ENABLED': False
+        'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+        'DOWNLOAD_HANDLERS': {
+            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+        },
+        'PLAYWRIGHT_LAUNCH_OPTIONS' : {
+            'headless': True,
+        },
+        'PLAYWRIGHT_BROWSER_TYPE': 'firefox'
     }
     
     def start_requests(self):
@@ -26,7 +35,7 @@ class CompanyWebSiteSpider(scrapy.Spider):
             company_name = company["Account Name"]
             query = f"{'+'.join(company_name.split())}+" + "+".join(keywords)
             url = f"https://duckduckgo.com/?q={query}"
-            yield scrapy.Request(url=url, callback=self.parse, meta={'name': company_name})
+            yield scrapy.Request(url=url, callback=self.parse, meta={'name': company_name, 'playwright': True})
 
     def parse(self, response):
 

@@ -3,3 +3,4 @@ scrapy-fake-useragent
 pandas
 bs4
 openpyxl
+scrapy-playwright
