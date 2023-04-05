@@ -3,10 +3,19 @@ import pandas as pd
 import os
 from bs4 import BeautifulSoup
 import urllib.parse
+from scrapy.utils.project import get_project_settings
 from company_parser.items import CompanyItem
 
 class CompanyWebSiteSpider(scrapy.Spider):
     name = "company_websites_spider"
+
+    custom_settings = {
+        "DOWNLOADER_MIDDLEWARES": {
+            'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
+            'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400,
+        },
+        'REDIRECT_ENABLED': False
+    }
     
     def start_requests(self):
         fname = os.path.join(os.getcwd(), 'full_sample.xlsx')
