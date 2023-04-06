@@ -12,18 +12,14 @@ class CompanyWebSiteSpider(scrapy.Spider):
     custom_settings = {
         "DOWNLOADER_MIDDLEWARES": {
             'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
-            'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400,
-            'scrapy_playwright.browser.BrowserMiddleware': 543
+            'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400
         },
+        'REDIRECT_ENABLED': False,
         'TWISTED_REACTOR': "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
         'DOWNLOAD_HANDLERS': {
             "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
             "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
-        },
-        'PLAYWRIGHT_LAUNCH_OPTIONS' : {
-            'headless': True,
-        },
-        'PLAYWRIGHT_BROWSER_TYPE': 'firefox'
+        }
     }
     
     def start_requests(self):
@@ -44,18 +40,13 @@ class CompanyWebSiteSpider(scrapy.Spider):
         stop_words = ["wikipedia", "linkedin", "facebook", "crunchbase", "https://craft.co"]
 
         if response.status == 200:
-
-            soup = BeautifulSoup(response.body, "html.parser")
-            div = soup.find_all("div", id="links")
-            if len(div) > 0:
-                results = div[0].find_all("a")
-                for result in results:
-                    href = result.get("href")
-                    if href and href.startswith("http") and all(stop not in href for stop in stop_words):
-                        website = href
-                        website = urllib.parse.unquote(website)
-                        parsed = urllib.parse.urlparse(website)
-                        website = urllib.parse.urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+            links = response.xpath('//div[@id="links"]//h2/a[contains(@href,"http")]/@href').getall()
+            stop_words_filter = filter(lambda x: all(stop not in x for stop in stop_words), links)
+            unquote_filter = filter(lambda x: urllib.parse.unquote(x), stop_words_filter)
+            path_filter = filter(lambda x: len(urllib.parse.urlparse(x).path.split('/')) < 3, unquote_filter)
+            links = list(path_filter)
+            if len(links) > 0:
+                website = links[0]
         item = CompanyItem(name=name, website=website)
         return item
         
