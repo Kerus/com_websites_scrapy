@@ -7,6 +7,49 @@ from scrapy import signals
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
+from scrapy.exceptions import NotConfigured
+
+from itertools import cycle
+
+class ProxyPlayWrightMiddleware:
+    def __init__(self, proxies):
+        self.proxy_requests = {}
+        for proxy in proxies:
+            self.proxy_requests[proxy] = 0
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        if not crawler.settings.getlist('PROXY_LIST'):
+            raise NotConfigured('No proxies provided')
+        proxies = crawler.settings.getlist('PROXY_LIST')
+        return cls(proxies)
+
+    def process_request(self, request, spider):
+        proxy, _ = min(self.proxy_requests.items(), key=lambda x: x[1])
+        request.meta['playwright'] = True
+        
+        request.meta['playwright_context'] = str(hash(request.meta.get('name', 'noname')))
+        request.meta['playwright_context_kwargs'] = {
+            "java_script_enabled": True,
+            "ignore_https_errors": True,
+            "proxy": {
+                "server": proxy,
+            },
+        }
+        
+        request.meta['proxy_info'] = proxy
+        spider.logger.debug(f'Using proxy {proxy}, which has been used {self.proxy_requests[proxy]} times so far.')
+        self.proxy_requests[proxy] += 1
+        
+        
+    def process_exception(self, request, exception, spider):
+        proxy = request.meta.get('proxy_info')
+        if proxy and self.proxy_requests[proxy] > 1:
+            self.proxy_requests[proxy] -= 1
+            spider.logger.debug(f'Removing proxy {proxy} from request {request}, which has been used {self.proxy_requests[proxy]} times so far.')
+            self.proxy_requests.pop(proxy, None)
+            if len(self.proxy_requests) == 0:
+                raise NotConfigured('All proxies are unusable')
 
 
 class CompanyParserSpiderMiddleware:
